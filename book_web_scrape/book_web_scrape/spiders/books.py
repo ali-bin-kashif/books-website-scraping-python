@@ -4,6 +4,8 @@ import pandas as pd
 
 class BooksSpider(scrapy.Spider):
     name = "books"
+    
+    # Global list of books
     books = []
     def start_requests(self):
         
@@ -26,17 +28,19 @@ class BooksSpider(scrapy.Spider):
 
     def page_parse(self, response):
         title = response.css('h1::text').get()
-        # print(title)
+
         cards = response.css('.product_pod')
-        # print('Books : ', len(cards))
         
+        # Looping in cards to get info
         for card in cards:
+
             book_title = card.css('h3>a::attr(title)').get()
             
             product_price = card.css('.product_price>p::text').get()
             
             star_rating = card.css('p::attr(class)').get()
             
+            # Creating dictionary which then can be saved as csv or json files
             books_dict = {
                 'Title' : book_title,
                 'Price' : product_price,
@@ -44,12 +48,19 @@ class BooksSpider(scrapy.Spider):
                 'Category' : title
             }
             
+            # Appending in the global book list
             BooksSpider.books.append(books_dict)
+        
+        # Get next button if present on page
+        next_button = response.css('.next')
+        
+        # If next button is present crawl the next page and scrape the data
+        if(next_button.get() != None):
+            next_path = next_button.css('a::attr(href)').get()
+            path_split = response.url.split('/')[0:7]
+            next_url = "/".join(path_split) + "/" + next_path
+            yield response.follow(url=next_url, callback=self.page_parse)
             
-            # img = card.css('.image_container img::attr(src)').get()
-            # path = 'books.csv'
-            # csv_file = open(path, 'a')
-            # csv_file.write(book_title.replace(",",":") + "," + product_price[1:] + "," + star_rating.split()[1] + "," + title+"\n")
-
+        # Creating a dataframe with the global list and exporting CSV File
         data = pd.DataFrame(BooksSpider.books)
-        data.to_csv('books.csv')
+        data.to_csv('scraped_data/books_data.csv', index=False)
